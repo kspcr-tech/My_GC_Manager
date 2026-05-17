@@ -1012,24 +1012,7 @@ const App = () => {
     return false;
   };
 
-  const parseExpiry = (dateStr?: string) => {
-    if (!dateStr) return Infinity;
-    const parts = dateStr.split(/[\/\-\s]/);
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10);
-      const monthStr = parts[1].toLowerCase();
-      const year = parseInt(parts[2], 10);
-      const months: Record<string, number> = { jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11 };
-      let month = months[monthStr.substring(0, 3)];
-      if (month !== undefined) {
-        return new Date(year, month, day).getTime();
-      }
-    }
-    const parsed = Date.parse(dateStr.replace(/[\/\-]/g, ' '));
-    return isNaN(parsed) ? Infinity : parsed;
-  };
-
-  const activeCards = cards.filter(c => !isCardArchived(c)).sort((a, b) => parseExpiry(a.expiryDate) - parseExpiry(b.expiryDate));
+  const activeCards = cards.filter(c => !isCardArchived(c));
   const archivedCards = cards.filter(c => isCardArchived(c));
 
   if (!isAuthenticated) return <AuthScreen onAuthenticated={() => setIsAuthenticated(true)} />;
