@@ -229,17 +229,12 @@ const SettingsModal = ({
   };
 
   const handleExport = () => {
-    const exportData = {
-      version: 1,
-      cards: cards,
-      brandConfigs: JSON.parse(localStorage.getItem('gc_brand_configs') || '{}')
-    };
-    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataStr = JSON.stringify(cards, null, 2);
     const blob = new Blob([dataStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `MyGC_backup_${new Date().toISOString().slice(0,10)}.json`;
+    link.download = `MyGC_cards_backup_${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -258,17 +253,6 @@ const SettingsModal = ({
             onImport(json);
             alert("Import Successful!");
             onClose();
-          }
-        } else if (json.cards && Array.isArray(json.cards)) {
-          if(confirm(`Found ${json.cards.length} cards and settings. Import?`)) {
-            onImport(json.cards);
-            if (json.brandConfigs) {
-               localStorage.setItem('gc_brand_configs', JSON.stringify(json.brandConfigs));
-               // To reflect immediately without reload, we ideally should call a setBrandConfigs. 
-               // However, onImport only takes cards right now. Let me reload after giving alert.
-            }
-            alert("Import Successful! Reloading app to apply settings.");
-            window.location.reload();
           }
         }
       } catch (err) {
@@ -872,7 +856,7 @@ const App = () => {
 
   // Auto Backup Effect
   useEffect(() => {
-    if (!fileHandle) return; // run if any data exists
+    if (!fileHandle || cards.length === 0) return;
     
     const saveData = async () => {
       setIsBackingUp(true);
@@ -885,14 +869,8 @@ const App = () => {
            return;
         }
 
-        const exportData = {
-          version: 1,
-          cards: cards,
-          brandConfigs: JSON.parse(localStorage.getItem('gc_brand_configs') || '{}')
-        };
-
         const writable = await fileHandle.createWritable();
-        await writable.write(JSON.stringify(exportData, null, 2));
+        await writable.write(JSON.stringify(cards, null, 2));
         await writable.close();
         
         setBackupStatus({ lastBackup: Date.now(), error: null, pendingPermission: false });
@@ -906,7 +884,7 @@ const App = () => {
 
     const timeout = setTimeout(saveData, 2000); // 2s debounce
     return () => clearTimeout(timeout);
-  }, [cards, brandConfigs, fileHandle]);
+  }, [cards, fileHandle]);
 
   const verifyPermission = async (handle: FileSystemFileHandle, withUserGesture: boolean) => {
     const opts = { mode: 'readwrite' as const };
@@ -923,7 +901,7 @@ const App = () => {
      try {
        // @ts-ignore - TS doesn't fully know showSaveFilePicker yet
        const handle = await window.showSaveFilePicker({
-          suggestedName: 'MyGC_backup.json',
+          suggestedName: 'kfc_cards_backup.json',
           types: [{
             description: 'JSON Files',
             accept: { 'application/json': ['.json'] },
