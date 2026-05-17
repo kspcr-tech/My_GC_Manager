@@ -639,7 +639,7 @@ const SMSUpdateModal = ({ isOpen, onClose, card, onProcess, brandConfig }: { isO
                  }}
                  className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200 active:scale-95"
                >
-                 <ExternalLink className="w-5 h-5" /> Web Check (Woohoo)
+                 <ExternalLink className="w-5 h-5" /> Web Check
                </button>
                )}
                
@@ -799,9 +799,20 @@ const App = () => {
   const [configModalBrand, setConfigModalBrand] = useState<string | null>(null);
 
   const getBrandConfig = (brand: string) => {
-    const defaultSms = brand.toUpperCase() === 'KFC' ? '55757575' : '';
-    const defaultUrl = brand.toUpperCase() !== 'KFC' ? 'https://mcdindia.woohoo.in/en-gb/balenq' : '';
-    return brandConfigs[brand] || { sms: defaultSms, url: defaultUrl, smsSyntax: '' };
+    const isKFC = brand.toUpperCase() === 'KFC';
+    // KFC uses 55757575, others default to Woohoo 9223004444
+    const defaultSms = isKFC ? '55757575' : '9223004444';
+    // KFC has no web check, others default to Woohoo check-balance URL
+    const defaultUrl = isKFC ? '' : 'https://www.woohoo.in/check-balance';
+    
+    const config = brandConfigs[brand] || { sms: '', url: '', smsSyntax: '' };
+    
+    return {
+      sms: config.sms || defaultSms,
+      // Force empty URL for KFC as per requirement
+      url: isKFC ? '' : (config.url || defaultUrl),
+      smsSyntax: config.smsSyntax || ''
+    };
   };
 
   const saveBrandConfig = (brand: string, config: {sms: string, url: string, smsSyntax?: string}) => {
