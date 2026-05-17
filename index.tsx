@@ -571,14 +571,14 @@ const CardItem: React.FC<CardItemProps> = ({ card, onDelete, onUpdateBalance, on
         </div>
         <div className="flex items-center justify-between pt-4 border-t border-white/20">
           <div className="flex flex-col gap-0.5"><div className="flex items-center gap-2 text-xs opacity-75"><div className={`w-2 h-2 rounded-full ${isArchived ? 'bg-gray-400' : 'bg-green-400'}`}></div><span>Updated {new Date(card.lastUpdated).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></div><a href="https://gift.kfc.co.in/balance" target="_blank" rel="noopener noreferrer" className="text-[10px] text-white/60 hover:text-white underline flex items-center gap-1 mt-1">Check Official Site <ExternalLink className="w-3 h-3" /></a></div>
-          <div className="flex gap-2"><button onClick={() => onCheckBalance(card)} className="px-3 py-2 rounded-full bg-white text-red-700 hover:bg-gray-100 font-bold text-xs flex items-center gap-2 transition-all active:scale-95 shadow-md"><RefreshCw className="w-4 h-4" /> Check</button><button onClick={() => onDelete(card.id)} className="p-2 rounded-full bg-white/10 hover:bg-white/20 hover:text-red-200 backdrop-blur-md transition-all active:scale-95"><Trash2 className="w-5 h-5" /></button></div>
+          <div className="flex gap-2"><button onClick={() => onCheckBalance(card)} className="px-3 py-2 rounded-full bg-white text-red-700 hover:bg-gray-100 font-bold text-xs flex items-center gap-2 transition-all active:scale-95 shadow-md"><RefreshCw className="w-4 h-4" /> Check</button><button onClick={() => { if(window.confirm('Are you sure you want to delete this card?')) onDelete(card.id); }} className="p-2 rounded-full bg-white/10 hover:bg-white/20 hover:text-red-200 backdrop-blur-md transition-all active:scale-95"><Trash2 className="w-5 h-5" /></button></div>
         </div>
       </div>
     </div>
   );
 };
 
-const SMSUpdateModal = ({ isOpen, onClose, card, onProcess }: { isOpen: boolean, onClose: () => void, card: GiftCard | null, onProcess: (text: string) => void }) => {
+const SMSUpdateModal = ({ isOpen, onClose, card, onProcess, brandConfig }: { isOpen: boolean, onClose: () => void, card: GiftCard | null, onProcess: (text: string) => void, brandConfig: {sms: string, url: string, smsSyntax?: string} }) => {
   const [text, setText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
@@ -586,20 +586,53 @@ const SMSUpdateModal = ({ isOpen, onClose, card, onProcess }: { isOpen: boolean,
   useEffect(() => { if (isOpen) { setText(''); setStep(1); setJustReturned(false); } }, [isOpen]);
   useEffect(() => { const handleFocus = () => { if (isOpen && step === 2) { setJustReturned(true); setTimeout(() => setJustReturned(false), 3000); } }; window.addEventListener('focus', handleFocus); return () => window.removeEventListener('focus', handleFocus); }, [isOpen, step]);
   const handleSubmit = async () => { if (!text.trim()) return; setIsProcessing(true); await onProcess(text); setIsProcessing(false); };
-  const handleSendSMS = () => { if (!card) return; const recipient = "55757575"; const body = card.cardNumber; const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent); const separator = isIOS ? '&' : '?'; window.location.href = `sms:${recipient}${separator}body=${encodeURIComponent(body)}`; setStep(2); };
+  const handleSendSMS = () => { if (!card || !brandConfig.sms) return; let body = card.cardNumber; if (brandConfig.smsSyntax) { body = brandConfig.smsSyntax.replace(/{card}/gi, card.cardNumber).replace(/{pin}/gi, card.pin); } const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent); const separator = isIOS ? '&' : '?'; window.location.href = `sms:${brandConfig.sms}${separator}body=${encodeURIComponent(body)}`; setStep(2); };
   const handlePaste = async () => { try { const clipboardText = await navigator.clipboard.readText(); if (clipboardText) setText(clipboardText); else alert('Clipboard is empty.'); } catch (err) { alert('Tap inside the box and select "Paste" manually.'); } };
+  
+  const hasSms = !!brandConfig.sms;
+  const hasUrl = !!brandConfig.url;
+
   if (!isOpen || !card) return null;
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden">
-        <div className="bg-gray-50 p-4 border-b flex justify-between items-center"><h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><MessageSquare className="w-5 h-5 text-red-600" /> Check Balance via SMS</h3><button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button></div>
+        <div className="bg-gray-50 p-4 border-b flex justify-between items-center"><h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><MessageSquare className="w-5 h-5 text-red-600" /> Check Balance</h3><button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button></div>
         <div className="p-6">
           <div className="flex items-center justify-center mb-6"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${step === 1 ? 'bg-red-600 text-white' : 'bg-green-500 text-white'}`}>1</div><div className={`w-12 h-1 transition-colors ${step === 2 ? 'bg-green-500' : 'bg-gray-200'}`}></div><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${step === 2 ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-500'}`}>2</div></div>
           {step === 1 ? (
             <div className="text-center space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="bg-blue-50 text-blue-800 text-sm p-4 rounded-xl text-left shadow-sm border border-blue-100"><p className="font-semibold mb-2">Instructions:</p><ul className="list-decimal pl-4 space-y-1 text-blue-900/80"><li>Use the official method to check your {card.brand} balance.</li><li>If by SMS, send the pre-filled code.</li><li><strong>Copy the reply or website text</strong> showing your balance.</li><li>Return here to auto-update.</li></ul></div>
-              <div className="py-2 opacity-50"><p className="text-[10px] text-gray-400 uppercase tracking-widest">CHECKING FOR CARD</p><p className="font-mono text-xs">{card.cardNumber}</p></div>
-              <button onClick={() => setStep(2)} className="w-full bg-red-600 text-white py-4 rounded-xl font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-200 active:scale-95">Tap to Paste Balance Text <ArrowRight className="w-5 h-5" /></button>
+               <div className="bg-blue-50 text-blue-800 text-sm p-4 rounded-xl text-left shadow-sm border border-blue-100"><p className="font-semibold mb-2">Instructions:</p><ul className="list-decimal pl-4 space-y-1 text-blue-900/80"><li>Use the official method to check your {card.brand} balance.</li><li><strong>Copy the reply or website text</strong> showing your balance.</li><li>Return here to auto-update.</li></ul></div>
+               <div className="py-2 opacity-50"><p className="text-[10px] text-gray-400 uppercase tracking-widest">CHECKING FOR CARD</p><p className="font-mono text-xs">{card.cardNumber}</p></div>
+               
+               {hasUrl && (
+               <button 
+                 onClick={() => {
+                   try { navigator.clipboard.writeText(`Card: ${card.cardNumber}\nPIN: ${card.pin}`); } catch(e) {}
+                   alert('Card Details Copied! Paste them on the website.');
+                   window.open(brandConfig.url, '_blank');
+                   setTimeout(() => setStep(2), 1000);
+                 }}
+                 className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200 active:scale-95"
+               >
+                 <ExternalLink className="w-5 h-5" /> Web Check (Woohoo)
+               </button>
+               )}
+               
+               {hasUrl && hasSms && (
+               <div className="relative flex py-2 items-center">
+                 <div className="flex-grow border-t border-gray-200"></div>
+                 <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-semibold">OR</span>
+                 <div className="flex-grow border-t border-gray-200"></div>
+               </div>
+               )}
+
+               {hasSms && (
+                 <button onClick={handleSendSMS} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 active:scale-95">Send SMS & Tap to Paste text <ArrowRight className="w-5 h-5" /></button>
+               )}
+
+               {!hasUrl && !hasSms && (
+                 <button onClick={() => setStep(2)} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 active:scale-95">Tap to Paste Balance Text <ArrowRight className="w-5 h-5" /></button>
+               )}
             </div>
           ) : (
             <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -685,6 +718,39 @@ const AddCardModal = ({ isOpen, onClose, onAdd, openSettings }: { isOpen: boolea
   );
 };
 
+const BrandSetupModal = ({ brand, currentConfig, onSave, onClose }: { brand: string, currentConfig: {sms: string, url: string, smsSyntax?: string}, onSave: (brand: string, config: {sms: string, url: string, smsSyntax?: string}) => void, onClose: () => void }) => {
+  const [sms, setSms] = useState(currentConfig.sms);
+  const [url, setUrl] = useState(currentConfig.url);
+  const [smsSyntax, setSmsSyntax] = useState(currentConfig.smsSyntax || '');
+  
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden p-6">
+        <h2 className="text-xl font-bold mb-4">Setup {brand}</h2>
+        <div className="space-y-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Check Official Site (URL)</label>
+            <input type="text" value={url} onChange={e => setUrl(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none placeholder:text-gray-400" placeholder="https://" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Check Balance SMS Number</label>
+            <input type="text" value={sms} onChange={e => setSms(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none placeholder:text-gray-400" placeholder="e.g. 55757575" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">SMS Syntax (Optional)</label>
+            <input type="text" value={smsSyntax} onChange={e => setSmsSyntax(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none placeholder:text-gray-400" placeholder="e.g. DOM Bal {card} {pin}" />
+            <p className="text-xs text-gray-500 mt-1">Leave empty to just send card number. Use {"{card}"} and {"{pin}"} as placeholders.</p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancel</button>
+          <button onClick={() => { onSave(brand, {sms, url, smsSyntax}); onClose(); }} className="flex-1 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700">Save</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
 const App = () => {
@@ -698,6 +764,26 @@ const App = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+
+  const [brandConfigs, setBrandConfigs] = useState<Record<string, {sms: string, url: string, smsSyntax?: string}>>(() => {
+    try {
+      const saved = localStorage.getItem('gc_brand_configs');
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+  const [configModalBrand, setConfigModalBrand] = useState<string | null>(null);
+
+  const getBrandConfig = (brand: string) => {
+    const defaultSms = brand.toUpperCase() === 'KFC' ? '55757575' : '';
+    const defaultUrl = brand.toUpperCase() !== 'KFC' ? 'https://mcdindia.woohoo.in/en-gb/balenq' : '';
+    return brandConfigs[brand] || { sms: defaultSms, url: defaultUrl, smsSyntax: '' };
+  };
+
+  const saveBrandConfig = (brand: string, config: {sms: string, url: string, smsSyntax?: string}) => {
+    const newConfigs = { ...brandConfigs, [brand]: config };
+    setBrandConfigs(newConfigs);
+    localStorage.setItem('gc_brand_configs', JSON.stringify(newConfigs));
+  };
 
   // File System Backup State
   const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
@@ -942,6 +1028,9 @@ const App = () => {
               <button onClick={() => setSelectedBrand(null)} className="flex items-center gap-1 text-sm font-bold text-gray-600 hover:text-black">
                 <ChevronDown className="w-4 h-4 rotate-90" /> Back to Brands
               </button>
+              <button onClick={() => setConfigModalBrand(selectedBrand)} className="flex items-center gap-1 text-sm font-bold text-indigo-600 hover:text-indigo-800">
+                <Settings className="w-4 h-4" /> Brand Setup
+              </button>
             </div>
             {activeCards.filter(c => c.brand === selectedBrand).length === 0 ? <div className="text-center py-8"><p className="text-gray-500 text-sm">All cards for this brand are archived.</p></div> : (
               activeCards.filter(c => c.brand === selectedBrand).map(card => <CardItem key={card.id} card={card} onDelete={deleteCard} onUpdateBalance={updateBalanceManually} onCheckBalance={(card) => setSmsModalState({ isOpen: true, card })} />)
@@ -959,7 +1048,21 @@ const App = () => {
 
       <div className="fixed bottom-6 right-6 z-40"><button onClick={() => setIsModalOpen(true)} className="bg-red-600 text-white p-4 rounded-full shadow-lg shadow-red-300 hover:bg-red-700 hover:scale-105 transition-all"><Plus className="w-8 h-8" /></button></div>
       <AddCardModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onAdd={handleAddCards} openSettings={() => { setIsModalOpen(false); setIsSettingsOpen(true); }} />
-      <SMSUpdateModal isOpen={smsModalState.isOpen} onClose={() => setSmsModalState({ isOpen: false, card: null })} card={smsModalState.card} onProcess={handleSMSParseProcess} />
+      <SMSUpdateModal 
+        isOpen={smsModalState.isOpen} 
+        onClose={() => setSmsModalState({ isOpen: false, card: null })} 
+        card={smsModalState.card} 
+        onProcess={handleSMSParseProcess} 
+        brandConfig={smsModalState.card ? getBrandConfig(smsModalState.card.brand) : {sms: '', url: ''}}
+      />
+      {configModalBrand && (
+        <BrandSetupModal 
+          brand={configModalBrand} 
+          currentConfig={getBrandConfig(configModalBrand)} 
+          onSave={saveBrandConfig} 
+          onClose={() => setConfigModalBrand(null)} 
+        />
+      )}
       <SettingsModal 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
