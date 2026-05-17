@@ -114,6 +114,17 @@ const getHandle = async (): Promise<FileSystemFileHandle | undefined> => {
   });
 };
 
+const clearHandle = async (): Promise<void> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.delete('backup_handle');
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
 // --- Gemini AI Setup ---
 
 const getApiKey = () => {
@@ -189,7 +200,8 @@ const SettingsModal = ({
   fileHandle,
   onSelectBackupFile,
   backupStatus,
-  onVerifyPermission
+  onVerifyPermission,
+  onDeleteAllData
 }: { 
   isOpen: boolean, 
   onClose: () => void,
@@ -198,7 +210,8 @@ const SettingsModal = ({
   fileHandle: FileSystemFileHandle | null,
   onSelectBackupFile: () => void,
   backupStatus: { lastBackup: number | null, error: string | null, pendingPermission: boolean },
-  onVerifyPermission: () => void
+  onVerifyPermission: () => void,
+  onDeleteAllData: () => void
 }) => {
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -221,7 +234,7 @@ const SettingsModal = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `kfc_cards_backup_${new Date().toISOString().slice(0,10)}.json`;
+    link.download = `MyGC_cards_backup_${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -398,6 +411,18 @@ const SettingsModal = ({
                   accept=".json" 
                   className="hidden" 
                 />
+             </div>
+             <div className="pt-4 border-t border-red-100 mt-4">
+                <button 
+                  onClick={() => {
+                    if(window.confirm('Are you ABSOLUTELY sure you want to permanently delete ALL data, cards, and settings? This cannot be undone.')) {
+                        onDeleteAllData();
+                    }
+                  }}
+                  className="w-full border border-red-200 bg-red-50 text-red-600 py-3 rounded-xl font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-5 h-5" /> Delete All Data
+                </button>
              </div>
           </div>
           
@@ -785,6 +810,21 @@ const App = () => {
     localStorage.setItem('gc_brand_configs', JSON.stringify(newConfigs));
   };
 
+  const handleDeleteAllData = async () => {
+    localStorage.removeItem('kfc_cards');
+    localStorage.removeItem('kfc_app_pin');
+    localStorage.removeItem('kfc_api_key');
+    localStorage.removeItem('gc_brand_configs');
+    try {
+      await clearHandle();
+    } catch(e) {}
+    setCards([]);
+    setBrandConfigs({});
+    setFileHandle(null);
+    setIsSettingsOpen(false);
+    window.location.reload(); 
+  };
+
   // File System Backup State
   const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [isBackingUp, setIsBackingUp] = useState(false);
@@ -1072,6 +1112,7 @@ const App = () => {
         onSelectBackupFile={handleSelectBackupFile}
         backupStatus={backupStatus}
         onVerifyPermission={() => fileHandle && verifyPermission(fileHandle, true).then(has => setBackupStatus(s => ({...s, pendingPermission: !has})))}
+        onDeleteAllData={handleDeleteAllData}
       />
       <InstallHelpModal isOpen={showInstallHelp} onClose={() => setShowInstallHelp(false)} />
     </div>
