@@ -793,7 +793,15 @@ const App = () => {
   const [brandConfigs, setBrandConfigs] = useState<Record<string, {sms: string, url: string, smsSyntax?: string}>>(() => {
     try {
       const saved = localStorage.getItem('gc_brand_configs');
-      return saved ? JSON.parse(saved) : {};
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const normalized: Record<string, {sms: string, url: string, smsSyntax?: string}> = {};
+        for (const key in parsed) {
+          normalized[key.trim().toUpperCase()] = parsed[key];
+        }
+        return normalized;
+      }
+      return {};
     } catch { return {}; }
   });
   const [configModalBrand, setConfigModalBrand] = useState<string | null>(null);
@@ -805,7 +813,7 @@ const App = () => {
     // KFC has no web check, others default to Woohoo check-balance URL
     const defaultUrl = isKFC ? '' : 'https://www.woohoo.in/check-balance';
     
-    const config = brandConfigs[brand] || { sms: '', url: '', smsSyntax: '' };
+    const config = brandConfigs[brand.trim().toUpperCase()] || { sms: '', url: '', smsSyntax: '' };
     
     return {
       sms: config.sms || defaultSms,
@@ -816,7 +824,7 @@ const App = () => {
   };
 
   const saveBrandConfig = (brand: string, config: {sms: string, url: string, smsSyntax?: string}) => {
-    const newConfigs = { ...brandConfigs, [brand]: config };
+    const newConfigs = { ...brandConfigs, [brand.trim().toUpperCase()]: config };
     setBrandConfigs(newConfigs);
     localStorage.setItem('gc_brand_configs', JSON.stringify(newConfigs));
   };
@@ -844,7 +852,12 @@ const App = () => {
   // Load from local storage on mount
   useEffect(() => {
     const saved = localStorage.getItem('kfc_cards');
-    if (saved) setCards(JSON.parse(saved));
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setCards(parsed.map((c: any) => ({ ...c, brand: (c.brand || 'Other').trim().toUpperCase() })));
+      } catch (e) {}
+    }
     if (Notification.permission === 'granted') setNotificationsEnabled(true);
     
     // Load persisted file handle
@@ -957,7 +970,7 @@ const App = () => {
       const duplicates: string[] = [];
       newCardsData.forEach(cardData => {
         const normalizedNum = cardData.cardNumber.trim();
-        const brand = cardData.brand || 'Other';
+        const brand = (cardData.brand || 'Other').trim().toUpperCase();
         if (updatedList.some(c => c.cardNumber === normalizedNum && c.brand === brand)) duplicates.push(normalizedNum);
         else updatedList.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 9), brand, cardNumber: normalizedNum, pin: cardData.pin, balance: cardData.balance, lastUpdated: Date.now() });
       });
@@ -971,9 +984,10 @@ const App = () => {
     setCards(prev => {
        const newCards = [...prev];
        importedCards.forEach(imp => {
-          const index = newCards.findIndex(c => c.cardNumber === imp.cardNumber);
-          if (index >= 0) newCards[index] = { ...newCards[index], ...imp, id: newCards[index].id };
-          else newCards.push({ ...imp, id: Date.now().toString() + Math.random().toString(36).substring(2, 9) });
+          const brand = (imp.brand || 'Other').trim().toUpperCase();
+          const index = newCards.findIndex(c => c.cardNumber === imp.cardNumber && c.brand === brand);
+          if (index >= 0) newCards[index] = { ...newCards[index], ...imp, brand, id: newCards[index].id };
+          else newCards.push({ ...imp, brand, id: Date.now().toString() + Math.random().toString(36).substring(2, 9) });
        });
        return newCards;
     });
