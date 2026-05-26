@@ -621,8 +621,15 @@ const SMSUpdateModal = ({ isOpen, onClose, card, onProcess, brandConfig, onUpdat
       const pinStr = card.pin ? card.pin.replace(/\s+/g, '') : '';
       const cardStr = card.cardNumber ? card.cardNumber.replace(/\s+/g, '') : '';
       const apiUrl = brandConfig.apiSyntax.replace(/{card}/gi, cardStr).replace(/{pin}/gi, pinStr);
-     const res = await fetch(apiUrl);
-      
+      let res = null
+      try {
+      //res =await fetch(apiUrl);
+      res = await fetch('https://ais-dev-jusp2fpdt33fpcnb2ogf3t-610962350115.asia-east1.run.app/api/proxyCheckBalance?url=' + encodeURIComponent(apiUrl));
+      alert("API Check CHK data: ");
+      } catch (err: any) {
+        alert("API came error: ");
+      res = await fetch(encodeURIComponent(apiUrl));
+      }
       if (!res.ok) throw new Error('API Request Failed: ' + apiUrl + res.status);
       const data = await res.json();
       alert("API Check data: " + data);
