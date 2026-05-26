@@ -629,6 +629,7 @@ const SMSUpdateModal = ({ isOpen, onClose, card, onProcess, brandConfig, onUpdat
       const balance = data.balance !== undefined ? parseFloat(data.balance) : (data.amount !== undefined ? parseFloat(data.amount) : null);
       
       if (balance !== null && !isNaN(balance)) {
+         alert(`Success! Found Balance: ${balance}`);
          onUpdateBalance(card.id, balance);
          onClose();
       } else {
@@ -642,7 +643,7 @@ const SMSUpdateModal = ({ isOpen, onClose, card, onProcess, brandConfig, onUpdat
          window.open(brandConfig.url, '_blank');
          setTimeout(() => setStep(2), 1000);
       } else {
-         alert("API check failed: " + err.message);
+         console.warn("API check failed: " + err.message);
       }
     } finally {
       setIsProcessing(false);
