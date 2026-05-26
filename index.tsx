@@ -621,9 +621,15 @@ const SMSUpdateModal = ({ isOpen, onClose, card, onProcess, brandConfig, onUpdat
       const pinStr = card.pin ? card.pin.replace(/\s+/g, '') : '';
       const cardStr = card.cardNumber ? card.cardNumber.replace(/\s+/g, '') : '';
       const apiUrl = brandConfig.apiSyntax.replace(/{card}/gi, cardStr).replace(/{pin}/gi, pinStr);
-      const res = await fetch('/api/proxyCheckBalance?url=' + encodeURIComponent(apiUrl));
-      if (!res.ok) throw new Error('API Request Failed: ' + res.status);
+      let res = null
+      try {
+      res =await fetch(apiUrl);
+      } catch (err: any) {
+      res = await fetch('/api/proxyCheckBalance?url=' + encodeURIComponent(apiUrl));
+      }
+      if (!res.ok) throw new Error('API Request Failed: ' + apiUrl + res.status);
       const data = await res.json();
+      alert("API Check data: " + data);
       const balance = data.balance !== undefined ? parseFloat(data.balance) : (data.amount !== undefined ? parseFloat(data.amount) : null);
       if (balance !== null && !isNaN(balance)) {
          onUpdateBalance(card.id, balance);
