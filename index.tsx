@@ -1212,5 +1212,8 @@ const App = () => {
   );
 };
 
-const root = createRoot(document.getElementById('root')!);
-root.render(<App />);
+const rootElement = document.getElementById('root')!;
+if (!(window as any).__reactRoot) {
+  (window as any).__reactRoot = createRoot(rootElement);
+}
+(window as any).__reactRoot.render(<App />);
