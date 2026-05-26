@@ -621,35 +621,28 @@ const SMSUpdateModal = ({ isOpen, onClose, card, onProcess, brandConfig, onUpdat
       const pinStr = card.pin ? card.pin.replace(/\s+/g, '') : '';
       const cardStr = card.cardNumber ? card.cardNumber.replace(/\s+/g, '') : '';
       const apiUrl = brandConfig.apiSyntax.replace(/{card}/gi, cardStr).replace(/{pin}/gi, pinStr);
-      let res = null
-      try {
-      //res =await fetch(apiUrl);
-      res = await fetch('https://ais-dev-jusp2fpdt33fpcnb2ogf3t-610962350115.asia-east1.run.app/api/proxyCheckBalance?url=' + encodeURIComponent(apiUrl));
-      alert("API Check CHK data: ");
-      } catch (err: any) {
-        alert("API came error: ");
-      res = await fetch(encodeURIComponent(apiUrl));
-      }
-      if (!res.ok) throw new Error('API Request Failed: ' + apiUrl + res.status);
+      
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error(`API Request Failed: ${res.status}`);
+      
       const data = await res.json();
-      alert("API Check data: " + data);
       const balance = data.balance !== undefined ? parseFloat(data.balance) : (data.amount !== undefined ? parseFloat(data.amount) : null);
+      
       if (balance !== null && !isNaN(balance)) {
          onUpdateBalance(card.id, balance);
          onClose();
       } else {
-         throw new Error("Balance missing from API response. Data: " + JSON.stringify(data));
+         throw new Error("Balance missing from API response.");
       }
     } catch (err: any) {
       console.error("API Check Error:", err);
-      alert("API Check Error: " + err.message);
       // Fallback to web check
       if (brandConfig.url) {
          try { navigator.clipboard.writeText(`Card: ${card.cardNumber}\nPIN: ${card.pin}`); } catch(e) {}
          window.open(brandConfig.url, '_blank');
          setTimeout(() => setStep(2), 1000);
       } else {
-         alert("API check failed and no Web Check URL configured.");
+         alert("API check failed: " + err.message);
       }
     } finally {
       setIsProcessing(false);
