@@ -603,7 +603,7 @@ const CardItem: React.FC<CardItemProps> = ({ card, onDelete, onUpdateBalance, on
   );
 };
 
-const SMSUpdateModal = ({ isOpen, onClose, card, onProcess, brandConfig }: { isOpen: boolean, onClose: () => void, card: GiftCard | null, onProcess: (text: string) => void, brandConfig: {sms: string, url: string, smsSyntax?: string} }) => {
+const SMSUpdateModal = ({ isOpen, onClose, card, onProcess, brandConfig, onUpdateBalance }: { isOpen: boolean, onClose: () => void, card: GiftCard | null, onProcess: (text: string) => void, brandConfig: {sms: string, url: string, smsSyntax?: string, apiSyntax?: string}, onUpdateBalance: (id: string, newBalance: number) => void }) => {
   const [text, setText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
@@ -614,8 +614,39 @@ const SMSUpdateModal = ({ isOpen, onClose, card, onProcess, brandConfig }: { isO
   const handleSendSMS = () => { if (!card || !brandConfig.sms) return; let body = card.cardNumber; if (brandConfig.smsSyntax) { body = brandConfig.smsSyntax.replace(/{card}/gi, card.cardNumber).replace(/{pin}/gi, card.pin); } const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent); const separator = isIOS ? '&' : '?'; window.location.href = `sms:${brandConfig.sms}${separator}body=${encodeURIComponent(body)}`; setStep(2); };
   const handlePaste = async () => { try { const clipboardText = await navigator.clipboard.readText(); if (clipboardText) setText(clipboardText); else alert('Clipboard is empty.'); } catch (err) { alert('Tap inside the box and select "Paste" manually.'); } };
   
+  const handleApiCheck = async () => {
+    if (!card || !brandConfig.apiSyntax) return;
+    setIsProcessing(true);
+    try {
+      const apiUrl = brandConfig.apiSyntax.replace(/{card}/gi, card.cardNumber.replace(/\s+/g, '')).replace(/{pin}/gi, card.pin);
+      const res = await fetch('/api/proxyCheckBalance?url=' + encodeURIComponent(apiUrl));
+      if (!res.ok) throw new Error('API Request Failed');
+      const data = await res.json();
+      const balance = data.balance !== undefined ? parseFloat(data.balance) : (data.amount !== undefined ? parseFloat(data.amount) : null);
+      if (balance !== null && !isNaN(balance)) {
+         onUpdateBalance(card.id, balance);
+         onClose();
+      } else {
+         throw new Error("Balance missing from API response");
+      }
+    } catch (err) {
+      console.error("API Check Error:", err);
+      // Fallback to web check
+      if (brandConfig.url) {
+         try { navigator.clipboard.writeText(`Card: ${card.cardNumber}\nPIN: ${card.pin}`); } catch(e) {}
+         window.open(brandConfig.url, '_blank');
+         setTimeout(() => setStep(2), 1000);
+      } else {
+         alert("API check failed and no Web Check URL configured.");
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const hasSms = !!brandConfig.sms;
   const hasUrl = !!brandConfig.url;
+  const hasApi = !!brandConfig.apiSyntax;
 
   if (!isOpen || !card) return null;
   return (
@@ -629,21 +660,34 @@ const SMSUpdateModal = ({ isOpen, onClose, card, onProcess, brandConfig }: { isO
                <div className="bg-blue-50 text-blue-800 text-sm p-4 rounded-xl text-left shadow-sm border border-blue-100"><p className="font-semibold mb-2">Instructions:</p><ul className="list-decimal pl-4 space-y-1 text-blue-900/80"><li>Use the official method to check your {card.brand} balance.</li><li><strong>Copy the reply or website text</strong> showing your balance.</li><li>Return here to auto-update.</li></ul></div>
                <div className="py-2 opacity-50"><p className="text-[10px] text-gray-400 uppercase tracking-widest">CHECKING FOR CARD</p><p className="font-mono text-xs">{card.cardNumber}</p></div>
                
-               {hasUrl && (
-               <button 
-                 onClick={() => {
-                   try { navigator.clipboard.writeText(`Card: ${card.cardNumber}\nPIN: ${card.pin}`); } catch(e) {}
-                   alert('Card Details Copied! Paste them on the website.');
-                   window.open(brandConfig.url, '_blank');
-                   setTimeout(() => setStep(2), 1000);
-                 }}
-                 className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200 active:scale-95"
-               >
-                 <ExternalLink className="w-5 h-5" /> Web Check
-               </button>
+               {(hasUrl || hasApi) && (
+               <div className="flex gap-2">
+                 {hasApi && (
+                   <button 
+                     onClick={handleApiCheck}
+                     disabled={isProcessing}
+                     className="flex-1 bg-violet-600 text-white py-4 rounded-xl font-bold hover:bg-violet-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-violet-200 active:scale-95 disabled:opacity-50"
+                   >
+                     {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />} API Check
+                   </button>
+                 )}
+                 {hasUrl && (
+                 <button 
+                   onClick={() => {
+                     try { navigator.clipboard.writeText(`Card: ${card.cardNumber}\nPIN: ${card.pin}`); } catch(e) {}
+                     alert('Card Details Copied! Paste them on the website.');
+                     window.open(brandConfig.url, '_blank');
+                     setTimeout(() => setStep(2), 1000);
+                   }}
+                   className="flex-1 bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200 active:scale-95"
+                 >
+                   <ExternalLink className="w-5 h-5" /> Web Check
+                 </button>
+                 )}
+               </div>
                )}
                
-               {hasUrl && hasSms && (
+               {(hasUrl || hasApi) && hasSms && (
                <div className="relative flex py-2 items-center">
                  <div className="flex-grow border-t border-gray-200"></div>
                  <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-semibold">OR</span>
@@ -743,19 +787,25 @@ const AddCardModal = ({ isOpen, onClose, onAdd, openSettings }: { isOpen: boolea
   );
 };
 
-const BrandSetupModal = ({ brand, currentConfig, onSave, onClose }: { brand: string, currentConfig: {sms: string, url: string, smsSyntax?: string}, onSave: (brand: string, config: {sms: string, url: string, smsSyntax?: string}) => void, onClose: () => void }) => {
+const BrandSetupModal = ({ brand, currentConfig, onSave, onClose }: { brand: string, currentConfig: {sms: string, url: string, smsSyntax?: string, apiSyntax?: string}, onSave: (brand: string, config: {sms: string, url: string, smsSyntax?: string, apiSyntax?: string}) => void, onClose: () => void }) => {
   const [sms, setSms] = useState(currentConfig.sms);
   const [url, setUrl] = useState(currentConfig.url);
   const [smsSyntax, setSmsSyntax] = useState(currentConfig.smsSyntax || '');
+  const [apiSyntax, setApiSyntax] = useState(currentConfig.apiSyntax || '');
   
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden p-6">
+      <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden p-6 max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">Setup {brand}</h2>
         <div className="space-y-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Check Official Site (URL)</label>
             <input type="text" value={url} onChange={e => setUrl(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none placeholder:text-gray-400" placeholder="https://" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">API Check Syntax (Optional)</label>
+            <input type="text" value={apiSyntax} onChange={e => setApiSyntax(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none placeholder:text-gray-400" placeholder="https://api.example.com/check?card={card}&pin={pin}" />
+            <p className="text-xs text-gray-500 mt-1">Use {"{card}"} and {"{pin}"} as placeholders. Returns JSON.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Check Balance SMS Number</label>
@@ -769,7 +819,7 @@ const BrandSetupModal = ({ brand, currentConfig, onSave, onClose }: { brand: str
         </div>
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded-lg">Cancel</button>
-          <button onClick={() => { onSave(brand, {sms, url, smsSyntax}); onClose(); }} className="flex-1 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700">Save</button>
+          <button onClick={() => { onSave(brand, {sms, url, smsSyntax, apiSyntax}); onClose(); }} className="flex-1 bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700">Save</button>
         </div>
       </div>
     </div>
@@ -790,12 +840,12 @@ const App = () => {
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
 
-  const [brandConfigs, setBrandConfigs] = useState<Record<string, {sms: string, url: string, smsSyntax?: string}>>(() => {
+  const [brandConfigs, setBrandConfigs] = useState<Record<string, {sms: string, url: string, smsSyntax?: string, apiSyntax?: string}>>(() => {
     try {
       const saved = localStorage.getItem('gc_brand_configs');
       if (saved) {
         const parsed = JSON.parse(saved);
-        const normalized: Record<string, {sms: string, url: string, smsSyntax?: string}> = {};
+        const normalized: Record<string, {sms: string, url: string, smsSyntax?: string, apiSyntax?: string}> = {};
         for (const key in parsed) {
           normalized[key.trim().toUpperCase()] = parsed[key];
         }
@@ -810,20 +860,22 @@ const App = () => {
     const isKFC = brand.toUpperCase() === 'KFC';
     // KFC uses 55757575, others default to Woohoo 9223004444
     const defaultSms = isKFC ? '55757575' : '9223004444';
-    // KFC has no web check, others default to Woohoo check-balance URL
-    const defaultUrl = isKFC ? '' : 'https://www.woohoo.in/check-balance';
+    const defaultUrl = 'https://mcdindia.woohoo.in/en-gb/balenq';
+    const defaultApi = 'https://gift-card-balance-api.onrender.com/api/checkBalance?cardNumber={card}&pin={pin}';
     
-    const config = brandConfigs[brand.trim().toUpperCase()] || { sms: '', url: '', smsSyntax: '' };
+    const config = brandConfigs[brand.trim().toUpperCase()] || { sms: '', url: '', smsSyntax: '', apiSyntax: '' };
     
+    const configUrl = config.url === 'https://www.woohoo.in/check-balance' ? defaultUrl : config.url;
+
     return {
       sms: config.sms || defaultSms,
-      // Force empty URL for KFC as per requirement
-      url: isKFC ? '' : (config.url || defaultUrl),
-      smsSyntax: config.smsSyntax || ''
+      url: configUrl || defaultUrl,
+      smsSyntax: config.smsSyntax || '',
+      apiSyntax: config.apiSyntax || defaultApi
     };
   };
 
-  const saveBrandConfig = (brand: string, config: {sms: string, url: string, smsSyntax?: string}) => {
+  const saveBrandConfig = (brand: string, config: {sms: string, url: string, smsSyntax?: string, apiSyntax?: string}) => {
     const newConfigs = { ...brandConfigs, [brand.trim().toUpperCase()]: config };
     setBrandConfigs(newConfigs);
     localStorage.setItem('gc_brand_configs', JSON.stringify(newConfigs));
@@ -1120,6 +1172,7 @@ const App = () => {
         card={smsModalState.card} 
         onProcess={handleSMSParseProcess} 
         brandConfig={smsModalState.card ? getBrandConfig(smsModalState.card.brand) : {sms: '', url: ''}}
+        onUpdateBalance={updateBalanceManually}
       />
       {configModalBrand && (
         <BrandSetupModal 
