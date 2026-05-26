@@ -568,7 +568,7 @@ const CardItem: React.FC<CardItemProps> = ({ card, onDelete, onUpdateBalance, on
   const [editBalance, setEditBalance] = useState(card.balance.toString());
   const saveBalance = () => { const val = parseFloat(editBalance); if (!isNaN(val)) { onUpdateBalance(card.id, val); setIsEditing(false); } };
   const copyToClipboard = (text: string) => { navigator.clipboard.writeText(text); };
-  const formatCardNumber = (num: string) => showDetails ? num.replace(/(.{4})/g, '$1 ').trim() : `•••• •••• •••• ${num.slice(-4)}`;
+  const formatCardNumber = (num: string) => { const clean = num.replace(/\s+/g, ''); return showDetails ? clean.replace(/(.{4})/g, '$1 ').trim() : `•••• •••• •••• ${clean.slice(-4)}`; };
   const cardStyle = isArchived ? "bg-gray-500 grayscale" : "bg-gradient-to-br from-indigo-500 to-purple-700";
 
   return (
@@ -855,7 +855,7 @@ const App = () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setCards(parsed.map((c: any) => ({ ...c, brand: (c.brand || 'Other').trim().toUpperCase() })));
+        setCards(parsed.map((c: any) => ({ ...c, brand: (c.brand || 'Other').trim().toUpperCase(), cardNumber: (c.cardNumber || '').replace(/\s+/g, '') })));
       } catch (e) {}
     }
     if (Notification.permission === 'granted') setNotificationsEnabled(true);
@@ -969,7 +969,7 @@ const App = () => {
       const updatedList = [...prev];
       const duplicates: string[] = [];
       newCardsData.forEach(cardData => {
-        const normalizedNum = cardData.cardNumber.trim();
+        const normalizedNum = cardData.cardNumber.replace(/\s+/g, '').trim();
         const brand = (cardData.brand || 'Other').trim().toUpperCase();
         if (updatedList.some(c => c.cardNumber === normalizedNum && c.brand === brand)) duplicates.push(normalizedNum);
         else updatedList.push({ id: Date.now().toString() + Math.random().toString(36).substring(2, 9), brand, cardNumber: normalizedNum, pin: cardData.pin, balance: cardData.balance, lastUpdated: Date.now() });
@@ -985,9 +985,10 @@ const App = () => {
        const newCards = [...prev];
        importedCards.forEach(imp => {
           const brand = (imp.brand || 'Other').trim().toUpperCase();
-          const index = newCards.findIndex(c => c.cardNumber === imp.cardNumber && c.brand === brand);
-          if (index >= 0) newCards[index] = { ...newCards[index], ...imp, brand, id: newCards[index].id };
-          else newCards.push({ ...imp, brand, id: Date.now().toString() + Math.random().toString(36).substring(2, 9) });
+          const normalizedNum = imp.cardNumber.replace(/\s+/g, '').trim();
+          const index = newCards.findIndex(c => c.cardNumber === normalizedNum && c.brand === brand);
+          if (index >= 0) newCards[index] = { ...newCards[index], ...imp, cardNumber: normalizedNum, brand, id: newCards[index].id };
+          else newCards.push({ ...imp, cardNumber: normalizedNum, brand, id: Date.now().toString() + Math.random().toString(36).substring(2, 9) });
        });
        return newCards;
     });
