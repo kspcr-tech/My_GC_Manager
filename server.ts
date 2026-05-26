@@ -18,26 +18,28 @@ async function startServer() {
     try {
         const targetUrl = req.query.url as string;
         if (!targetUrl) {
-            res.status(400).json({ error: "Missing url parameter" });
+            res.json({ success: false, status: 400, error: "Missing url parameter" });
             return;
         }
 
         const fetchRes = await fetch(targetUrl, {
             headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "application/json",
             },
         });
         
         if (!fetchRes.ok) {
-            res.status(fetchRes.status).json({ error: "Upstream API error" });
+            const errText = await fetchRes.text();
+            res.json({ success: false, status: fetchRes.status, error: "Upstream API error", details: errText, urlTried: targetUrl });
             return;
         }
 
         const data = await fetchRes.json();
-        res.json(data);
+        res.json({ success: true, data });
     } catch (e: any) {
         console.error("Proxy error:", e);
-        res.status(500).json({ error: "Failed to fetch from target API" });
+        res.json({ success: false, status: 500, error: "Failed to fetch from target API: " + e.message });
     }
   });
 
@@ -51,7 +53,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
+    app.use((req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
