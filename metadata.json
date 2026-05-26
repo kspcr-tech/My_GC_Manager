@@ -2,7 +2,5 @@
   "description": "Manage all your GC",
   "requestFramePermissions": [],
   "name": "My GC vault",
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": []
 }
