@@ -290,6 +290,18 @@ const SettingsModal = ({
               </div>
               <label className="text-sm font-bold text-gray-700">AI Features</label>
             </div>
+            
+            {!apiKey && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-lg flex items-start justify-between gap-2 shadow-sm">
+                <span>
+                  <strong>⚠️ Missing API Key:</strong> AI features like auto-updating balance from SMS / Email are disabled. 
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="block mt-1 text-amber-700 hover:text-amber-900 underline font-semibold">
+                    Get a Free Google AI Studio Key &rarr;
+                  </a>
+                </span>
+              </div>
+            )}
+            
             <div className="relative">
               <input 
                 type={showKey ? "text" : "password"} 
@@ -845,6 +857,14 @@ const App = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
+
+  useEffect(() => {
+    // Re-check API key status whenever settings is closed or app loads
+    if (!isSettingsOpen) {
+      setHasApiKey(!!getApiKey());
+    }
+  }, [isSettingsOpen]);
 
   const [brandConfigs, setBrandConfigs] = useState<Record<string, {sms: string, url: string, smsSyntax?: string, apiSyntax?: string}>>(() => {
     try {
@@ -1088,6 +1108,19 @@ const App = () => {
           <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-3"><div className="bg-blue-100 p-2 rounded-full"><Bell className="w-5 h-5 text-blue-600" /></div><div><p className="text-sm font-bold text-gray-800">Enable Alerts</p><p className="text-xs text-gray-500">Get notified on updates</p></div></div>
             <button onClick={enableNotifications} className="text-xs bg-blue-600 text-white px-3 py-2 rounded-lg font-bold hover:bg-blue-700 transition">Enable</button>
+          </div>
+        )}
+        
+        {!hasApiKey && (
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="bg-amber-100 p-2 rounded-full"><AlertCircle className="w-5 h-5 text-amber-600" /></div>
+              <div>
+                <p className="text-sm font-bold text-gray-800">AI Key Missing</p>
+                <p className="text-xs text-gray-500">Add key to unlock AI features</p>
+              </div>
+            </div>
+            <button onClick={() => setIsSettingsOpen(true)} className="text-xs bg-amber-600 text-white px-3 py-2 rounded-lg font-bold hover:bg-amber-700 transition whitespace-nowrap">Settings</button>
           </div>
         )}
 
