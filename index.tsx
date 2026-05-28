@@ -215,16 +215,24 @@ const SettingsModal = ({
 }) => {
   const [apiKey, setApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
+  const [isKeySaved, setIsKeySaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      setApiKey(localStorage.getItem('kfc_api_key') || '');
+      const stored = localStorage.getItem('kfc_api_key') || '';
+      setApiKey(stored);
+      setIsKeySaved(!!stored);
     }
   }, [isOpen]);
 
   const handleSaveKey = () => {
+    if (!apiKey.trim()) {
+      alert("Invalid API Key");
+      return;
+    }
     localStorage.setItem('kfc_api_key', apiKey.trim());
+    setIsKeySaved(true);
     alert("AI Key Saved!");
   };
 
@@ -288,10 +296,17 @@ const SettingsModal = ({
               <div className="bg-purple-100 p-1.5 rounded-lg">
                 <Smartphone className="w-4 h-4 text-purple-600" />
               </div>
-              <label className="text-sm font-bold text-gray-700">AI Features</label>
+              <div className="flex items-center gap-2 flex-1">
+                <label className="text-sm font-bold text-gray-700">AI Features</label>
+                {isKeySaved && (
+                  <span className="text-[10px] font-bold text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" /> Activated
+                  </span>
+                )}
+              </div>
             </div>
             
-            {!apiKey && (
+            {!isKeySaved && (
               <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-lg flex items-start justify-between gap-2 shadow-sm">
                 <span>
                   <strong>⚠️ Missing API Key:</strong> AI features like auto-updating balance from SMS / Email are disabled. 
@@ -306,7 +321,10 @@ const SettingsModal = ({
               <input 
                 type={showKey ? "text" : "password"} 
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  setIsKeySaved(e.target.value === localStorage.getItem('kfc_api_key') && e.target.value !== '');
+                }}
                 className="w-full p-3 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 outline-none"
                 placeholder="Gemini API Key"
               />
@@ -317,9 +335,16 @@ const SettingsModal = ({
                 {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            
+            <div className="flex justify-between items-center mt-1">
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline">
+                Get a free API key &rarr;
+              </a>
+            </div>
+
             <button 
               onClick={handleSaveKey}
-              className="w-full mt-1 bg-gray-800 text-white py-2 rounded-lg font-medium hover:bg-gray-900 flex items-center justify-center gap-2 text-xs"
+              className="w-full mt-2 bg-gray-800 text-white py-2 rounded-lg font-medium hover:bg-gray-900 flex items-center justify-center gap-2 text-xs"
             >
               <Save className="w-3 h-3" /> Save Key
             </button>
